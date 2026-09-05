@@ -112,7 +112,7 @@ export async function POST(req) {
           role: "user",
           parts: [
             {
-              text: "Transcribe this audio recording of a workplace meeting as plain text, as accurately as possible. Break it into paragraphs at natural pauses or speaker changes. Don't guess or invent speaker names unless one is clearly stated aloud — use 'Speaker 1', 'Speaker 2', etc. if you can distinguish voices but not names. Output only the transcript, no commentary or summary.",
+              text: "Transcribe this audio recording of a workplace meeting as plain text, as accurately as possible. Break it into paragraphs at natural pauses or speaker changes. Don't guess or invent speaker names unless one is clearly stated aloud — use 'Speaker 1', 'Speaker 2', etc. if you can distinguish voices but not names. If any stretch of audio is unclear, garbled, or too quiet to make out, write '[inaudible]' for that stretch rather than guessing at plausible-sounding words — never invent content that isn't actually in the audio. Output only the transcript, no commentary or summary.",
             },
             { inline_data: { mime_type: mimeType, data: base64Audio } },
           ],
