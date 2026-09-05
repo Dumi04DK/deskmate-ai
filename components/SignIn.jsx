@@ -70,8 +70,8 @@ function InfoScreen({ title, message, cta, onCta }) {
 // the resulting auth state change itself via supabase.auth.onAuthStateChange
 // and re-renders once a session exists (or, for a recovery link, shows
 // ResetPasswordForm below instead).
-export default function SignIn() {
-  const [mode, setMode] = useState("signup"); // "signup" | "signin" | "forgot"
+export default function SignIn({ justConfirmed = false }) {
+  const [mode, setMode] = useState(justConfirmed ? "signin" : "signup"); // "signup" | "signin" | "forgot"
   const [screen, setScreen] = useState("form"); // "form" | "confirm-email" | "forgot-sent"
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -91,7 +91,15 @@ export default function SignIn() {
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { name: name.trim(), company: company.trim() || null } },
+          options: {
+            data: { name: name.trim(), company: company.trim() || null },
+            // Marks the confirmation redirect so Workspace can tell
+            // "just confirmed via email" apart from any other sign-in
+            // and deliberately sign back out instead of dropping the
+            // user straight into the dashboard.
+            emailRedirectTo:
+              typeof window !== "undefined" ? `${window.location.origin}?confirmed=1` : undefined,
+          },
         });
         if (signUpError) throw signUpError;
         // No session yet means the project has "confirm email" turned on.
@@ -181,6 +189,11 @@ export default function SignIn() {
           onSubmit={submit}
           className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"
         >
+          {justConfirmed && (
+            <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              Email confirmed — sign in to continue.
+            </p>
+          )}
           <div className="space-y-4">
             {mode === "signup" && (
               <div>

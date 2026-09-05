@@ -214,14 +214,16 @@ function formatDuration(totalSeconds) {
 /* ---------- Meeting recording (meeting summarizer) ---------- */
 
 // Kept in sync with MAX_AUDIO_BYTES in app/api/transcribe/route.js.
-// At this bitrate, a full 20-minute recording is ~2.9MB — comfortably
-// under that 4MB server cap, with headroom for container/encoder
-// overhead. (32kbps would have produced ~4.6MB at the full 20 minutes —
-// over the cap — so a max-length recording would have been rejected
-// right at the finish line. Lowering the bitrate keeps both numbers
-// consistent instead of shortening the advertised recording time.)
-const MAX_RECORD_SECONDS = 20 * 60;
-const RECORD_BITS_PER_SECOND = 20000;
+// 20kbps used to be the bitrate here, but it's too low for Opus to
+// keep speech intelligible — that's what was causing wildly wrong
+// transcriptions, not the AI model. 32kbps is a real quality step up
+// for voice. At this bitrate a full 15-minute recording is ~3.4MB,
+// leaving ~14% headroom under the 4MB server cap for container/encoder
+// overhead — this is a genuine tradeoff against the old 20-minute cap,
+// traded away on purpose since accurate transcription matters more than
+// a few extra minutes.
+const MAX_RECORD_SECONDS = 15 * 60;
+const RECORD_BITS_PER_SECOND = 32000;
 
 function pickRecorderMimeType() {
   if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return "";
@@ -975,7 +977,14 @@ function MeetingSummarizerView() {
   const startRecording = async () => {
     setRecordError("");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Explicit constraints rather than bare `audio: true` — most
+      // browsers default these on already, but voice-optimized capture
+      // (vs. whatever a given device's raw default is) matters more now
+      // that the recording itself is compressed harder (see
+      // RECORD_BITS_PER_SECOND below) to fit the upload size cap.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
       const mimeType = pickRecorderMimeType();
       const recorder = new MediaRecorder(
         stream,
@@ -1860,15 +1869,51 @@ function useSupabaseSession() {
     authUser: null,
     profile: null,
     recovering: false,
+    justConfirmed: false,
   });
 
   useEffect(() => {
     const supabase = createClient();
     let active = true;
 
+    // The confirmation email's redirect carries ?confirmed=1 (see
+    // SignIn.jsx's signUp call) — that's the only reliable way to tell
+    // "just confirmed via email" apart from any other sign-in, since
+    // Supabase auto-establishes a real session on confirmation and
+    // fires the same SIGNED_IN event either way. Read it once up front
+    // (`let`, not `const`) so handling it can clear the flag — otherwise
+    // a normal sign-in right afterward, in the same page load, would
+    // hit this branch again and get signed straight back out.
+    let cameFromConfirmation =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("confirmed") === "1";
+
     async function load(authUser, recovering) {
+      if (cameFromConfirmation && authUser) {
+        cameFromConfirmation = false;
+        const url = new URL(window.location.href);
+        url.searchParams.delete("confirmed");
+        window.history.replaceState({}, "", url.toString());
+        await supabase.auth.signOut();
+        if (active)
+          setState({
+            loading: false,
+            authUser: null,
+            profile: null,
+            recovering: false,
+            justConfirmed: true,
+          });
+        return;
+      }
       if (!authUser) {
-        if (active) setState({ loading: false, authUser: null, profile: null, recovering: false });
+        if (active)
+          setState((s) => ({
+            loading: false,
+            authUser: null,
+            profile: null,
+            recovering: false,
+            justConfirmed: s.justConfirmed,
+          }));
         return;
       }
       const { data: profile } = await supabase
@@ -1876,7 +1921,14 @@ function useSupabaseSession() {
         .select("name, company")
         .eq("id", authUser.id)
         .single();
-      if (active) setState({ loading: false, authUser, profile: profile || null, recovering });
+      if (active)
+        setState({
+          loading: false,
+          authUser,
+          profile: profile || null,
+          recovering,
+          justConfirmed: false,
+        });
     }
 
     supabase.auth.getUser().then(({ data }) => load(data.user, false));
@@ -1902,7 +1954,7 @@ function useSupabaseSession() {
 }
 
 export default function Workspace() {
-  const { loading, authUser, profile, recovering } = useSupabaseSession();
+  const { loading, authUser, profile, recovering, justConfirmed } = useSupabaseSession();
 
   return (
     <>
@@ -1910,7 +1962,7 @@ export default function Workspace() {
       {loading ? null : recovering ? (
         <ResetPasswordForm />
       ) : !authUser ? (
-        <SignIn />
+        <SignIn justConfirmed={justConfirmed} />
       ) : (
         <AppShell
           authUser={authUser}
