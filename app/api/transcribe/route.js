@@ -58,8 +58,10 @@ export async function POST(req) {
     const rateLimit = checkRateLimit(clientKey);
     if (rateLimit.limited) {
       return Response.json(
-        { error: `You're sending requests too quickly. Please wait ${rateLimit.retryAfterSeconds}s and try again.` },
-        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
+        {
+          error: `You're sending requests too quickly. Please wait ${rateLimit.retryAfterSeconds}s and try again.`,
+        },
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
       );
     }
 
@@ -67,7 +69,10 @@ export async function POST(req) {
     try {
       formData = await req.formData();
     } catch {
-      return Response.json({ error: "Request must be multipart form data with an 'audio' field." }, { status: 400 });
+      return Response.json(
+        { error: "Request must be multipart form data with an 'audio' field." },
+        { status: 400 },
+      );
     }
 
     const file = formData.get("audio");
@@ -79,16 +84,21 @@ export async function POST(req) {
     }
     if (file.size > MAX_AUDIO_BYTES) {
       return Response.json(
-        { error: `Recording is too large (max ${(MAX_AUDIO_BYTES / (1024 * 1024)).toFixed(1)}MB) — try a shorter recording.` },
-        { status: 400 }
+        {
+          error: `Recording is too large (max ${(MAX_AUDIO_BYTES / (1024 * 1024)).toFixed(1)}MB) — try a shorter recording.`,
+        },
+        { status: 400 },
       );
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return Response.json(
-        { error: "Server is missing GEMINI_API_KEY. Add it to .env.local (local) or your host's environment variables (production)." },
-        { status: 500 }
+        {
+          error:
+            "Server is missing GEMINI_API_KEY. Add it to .env.local (local) or your host's environment variables (production).",
+        },
+        { status: 500 },
       );
     }
 
@@ -122,13 +132,19 @@ export async function POST(req) {
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
           body: JSON.stringify(requestBody),
           signal: controller.signal,
-        }
+        },
       );
     } catch (err) {
       if (err.name === "AbortError") {
-        return Response.json({ error: "Transcription took too long. Try a shorter recording." }, { status: 504 });
+        return Response.json(
+          { error: "Transcription took too long. Try a shorter recording." },
+          { status: 504 },
+        );
       }
-      return Response.json({ error: "Could not reach the AI provider. Check your connection and try again." }, { status: 502 });
+      return Response.json(
+        { error: "Could not reach the AI provider. Check your connection and try again." },
+        { status: 502 },
+      );
     } finally {
       clearTimeout(timeout);
     }
@@ -137,7 +153,10 @@ export async function POST(req) {
     try {
       data = await geminiRes.json();
     } catch {
-      return Response.json({ error: "The AI provider returned an unreadable response." }, { status: 502 });
+      return Response.json(
+        { error: "The AI provider returned an unreadable response." },
+        { status: 502 },
+      );
     }
 
     if (!geminiRes.ok) {
@@ -150,12 +169,20 @@ export async function POST(req) {
     }
 
     const parts = data?.candidates?.[0]?.content?.parts || [];
-    const text = parts.map((p) => p.text || "").join("\n").trim();
+    const text = parts
+      .map((p) => p.text || "")
+      .join("\n")
+      .trim();
 
     return Response.json({
-      text: text || "Couldn't make out any speech in that recording — try again closer to the microphone.",
+      text:
+        text ||
+        "Couldn't make out any speech in that recording — try again closer to the microphone.",
     });
   } catch (err) {
-    return Response.json({ error: "Unexpected server error while transcribing audio." }, { status: 500 });
+    return Response.json(
+      { error: "Unexpected server error while transcribing audio." },
+      { status: 500 },
+    );
   }
 }

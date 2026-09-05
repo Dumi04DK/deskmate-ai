@@ -96,7 +96,7 @@ export async function POST(req) {
         {
           error: `You're sending requests too quickly. Please wait ${rateLimit.retryAfterSeconds}s and try again.`,
         },
-        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
       );
     }
 
@@ -116,8 +116,11 @@ export async function POST(req) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return Response.json(
-        { error: "Server is missing GEMINI_API_KEY. Add it to .env.local (local) or your host's environment variables (production)." },
-        { status: 500 }
+        {
+          error:
+            "Server is missing GEMINI_API_KEY. Add it to .env.local (local) or your host's environment variables (production).",
+        },
+        { status: 500 },
       );
     }
 
@@ -147,13 +150,19 @@ export async function POST(req) {
           },
           body: JSON.stringify(requestBody),
           signal: controller.signal,
-        }
+        },
       );
     } catch (err) {
       if (err.name === "AbortError") {
-        return Response.json({ error: "The AI provider took too long to respond. Please try again." }, { status: 504 });
+        return Response.json(
+          { error: "The AI provider took too long to respond. Please try again." },
+          { status: 504 },
+        );
       }
-      return Response.json({ error: "Could not reach the AI provider. Check your connection and try again." }, { status: 502 });
+      return Response.json(
+        { error: "Could not reach the AI provider. Check your connection and try again." },
+        { status: 502 },
+      );
     } finally {
       clearTimeout(timeout);
     }
@@ -162,7 +171,10 @@ export async function POST(req) {
     try {
       data = await geminiRes.json();
     } catch {
-      return Response.json({ error: "The AI provider returned an unreadable response." }, { status: 502 });
+      return Response.json(
+        { error: "The AI provider returned an unreadable response." },
+        { status: 502 },
+      );
     }
 
     if (!geminiRes.ok) {
@@ -182,8 +194,13 @@ export async function POST(req) {
       .join("\n")
       .trim();
 
-    return Response.json({ text: text || "The AI returned an empty response. Try rephrasing your request." });
+    return Response.json({
+      text: text || "The AI returned an empty response. Try rephrasing your request.",
+    });
   } catch (err) {
-    return Response.json({ error: "Unexpected server error while calling the AI." }, { status: 500 });
+    return Response.json(
+      { error: "Unexpected server error while calling the AI." },
+      { status: 500 },
+    );
   }
 }

@@ -16,12 +16,12 @@ URL and the two API keys (Settings → API) — you'll need them for step 3.
 Dashboard → **SQL Editor** → New query → paste the entire contents of
 [`schema.sql`](./schema.sql) → **Run**. It creates:
 
-| Table | Replaces (localStorage key) | Purpose |
-|---|---|---|
-| `profiles` | `aiw_user` | Name/company shown in the sidebar |
-| `generations` | `aiw_email`, `aiw_meetings`, `aiw_tasks`, `aiw_research`, `aiw_history` | Every AI generation — powers both the current-draft view and the History lists |
-| `chat_messages` | `aiw_chat` | The chatbot's conversation |
-| `usage_daily` | *(new)* | Per-user daily request counter, for real rate limiting |
+| Table           | Replaces (localStorage key)                                             | Purpose                                                                        |
+| --------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `profiles`      | `aiw_user`                                                              | Name/company shown in the sidebar                                              |
+| `generations`   | `aiw_email`, `aiw_meetings`, `aiw_tasks`, `aiw_research`, `aiw_history` | Every AI generation — powers both the current-draft view and the History lists |
+| `chat_messages` | `aiw_chat`                                                              | The chatbot's conversation                                                     |
+| `usage_daily`   | _(new)_                                                                 | Per-user daily request counter, for real rate limiting                         |
 
 Row Level Security is enabled on all four — each signed-in user can
 only ever read/write their own rows.

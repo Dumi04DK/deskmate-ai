@@ -237,7 +237,7 @@ async function extractPdfText(file) {
   const pdfjsLib = await import("pdfjs-dist/build/pdf.mjs");
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     "pdfjs-dist/build/pdf.worker.min.mjs",
-    import.meta.url
+    import.meta.url,
   ).toString();
   const buffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
@@ -267,7 +267,9 @@ async function extractFileText(file) {
   } else if (name.endsWith(".txt") || name.endsWith(".md") || file.type.startsWith("text/")) {
     text = await file.text();
   } else {
-    throw new Error("Unsupported file type — upload a PDF, .txt, or .md file, or paste the text directly.");
+    throw new Error(
+      "Unsupported file type — upload a PDF, .txt, or .md file, or paste the text directly.",
+    );
   }
   text = text.replace(/[ \t]+\n/g, "\n").trim();
   if (!text) {
@@ -332,7 +334,11 @@ function ErrorBanner({ message, onRetry, onDismiss }) {
         </button>
       )}
       {onDismiss && (
-        <button onClick={onDismiss} aria-label="Dismiss error" className="shrink-0 text-red-400 hover:text-red-600">
+        <button
+          onClick={onDismiss}
+          aria-label="Dismiss error"
+          className="shrink-0 text-red-400 hover:text-red-600"
+        >
           <X size={14} />
         </button>
       )}
@@ -354,7 +360,16 @@ function ViewHeader({ icon: Icon, title, subtitle }) {
   );
 }
 
-function OutputPanel({ icon: Icon, title, value, onChange, loading, onRegenerate, placeholder, tips }) {
+function OutputPanel({
+  icon: Icon,
+  title,
+  value,
+  onChange,
+  loading,
+  onRegenerate,
+  placeholder,
+  tips,
+}) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
     if (navigator.clipboard) navigator.clipboard.writeText(value || "");
@@ -577,7 +592,10 @@ function DashboardBannerCarousel({ onNavigate }) {
   // mouseleave that never fires after a touch tap) would otherwise
   // look like the carousel silently stopped working.
   useEffect(() => {
-    const id = setInterval(() => setIndex((i) => (i + 1) % DASHBOARD_BANNERS.length), BANNER_INTERVAL_MS);
+    const id = setInterval(
+      () => setIndex((i) => (i + 1) % DASHBOARD_BANNERS.length),
+      BANNER_INTERVAL_MS,
+    );
     return () => clearInterval(id);
   }, []);
 
@@ -585,25 +603,42 @@ function DashboardBannerCarousel({ onNavigate }) {
   const Icon = banner.icon;
 
   return (
-    <div className={`relative min-h-[220px] overflow-hidden rounded-2xl shadow-sm transition-colors duration-500 sm:min-h-[240px] ${banner.bg} ${banner.text}`}>
+    <div
+      className={`relative min-h-[220px] overflow-hidden rounded-2xl shadow-sm transition-colors duration-500 sm:min-h-[240px] ${banner.bg} ${banner.text}`}
+    >
       {/* Decorative background blobs — purely aesthetic, clipped to the card. One drifts slowly for ambient life. */}
-      <div className={`pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full ${banner.blob1}`} />
-      <div className={`aiw-blob-drift pointer-events-none absolute -right-6 bottom-[-4.5rem] h-48 w-48 rounded-full ${banner.blob2}`} />
+      <div
+        className={`pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full ${banner.blob1}`}
+      />
+      <div
+        className={`aiw-blob-drift pointer-events-none absolute -right-6 bottom-[-4.5rem] h-48 w-48 rounded-full ${banner.blob2}`}
+      />
 
-      <div key={index} className="aiw-banner-content relative flex h-full flex-col justify-center gap-5 p-6 sm:p-10">
-        <p className={`text-xs font-bold uppercase tracking-widest ${banner.wordmark}`}>Deskmate AI</p>
+      <div
+        key={index}
+        className="aiw-banner-content relative flex h-full flex-col justify-center gap-5 p-6 sm:p-10"
+      >
+        <p className={`text-xs font-bold uppercase tracking-widest ${banner.wordmark}`}>
+          Deskmate AI
+        </p>
 
         <div className="flex items-center gap-5">
           <div className="relative shrink-0">
-            <div className={`flex h-20 w-20 items-center justify-center rounded-2xl shadow-sm sm:h-24 sm:w-24 ${banner.plate}`}>
+            <div
+              className={`flex h-20 w-20 items-center justify-center rounded-2xl shadow-sm sm:h-24 sm:w-24 ${banner.plate}`}
+            >
               <Icon size={36} className={banner.plateIcon} />
             </div>
-            <div className={`aiw-sparkle-badge absolute -bottom-1.5 -right-1.5 flex h-7 w-7 items-center justify-center rounded-full shadow-sm ${banner.badge}`}>
+            <div
+              className={`aiw-sparkle-badge absolute -bottom-1.5 -right-1.5 flex h-7 w-7 items-center justify-center rounded-full shadow-sm ${banner.badge}`}
+            >
               <Sparkles size={13} className={banner.badgeIcon} />
             </div>
           </div>
           <div className="min-w-0">
-            <h3 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">{banner.title}</h3>
+            <h3 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">
+              {banner.title}
+            </h3>
             <p className={`mt-1 max-w-md text-sm sm:text-base ${banner.body_}`}>{banner.body}</p>
           </div>
         </div>
@@ -624,7 +659,9 @@ function DashboardBannerCarousel({ onNavigate }) {
             aria-label={`Show banner ${i + 1} of ${DASHBOARD_BANNERS.length}`}
             aria-current={i === index ? "true" : undefined}
             className={`h-1.5 rounded-full transition-all ${
-              i === index ? `w-6 ${banner.text === "text-white" ? "bg-white" : "bg-stone-900"}` : "bg-current opacity-25 hover:opacity-50 w-1.5"
+              i === index
+                ? `w-6 ${banner.text === "text-white" ? "bg-white" : "bg-stone-900"}`
+                : "bg-current opacity-25 hover:opacity-50 w-1.5"
             }`}
           />
         ))}
@@ -635,11 +672,36 @@ function DashboardBannerCarousel({ onNavigate }) {
 
 function DashboardView({ onNavigate, userName }) {
   const tools = [
-    { id: "email", title: "Smart Email Generator", desc: "Draft polished emails in seconds", icon: Mail },
-    { id: "meetings", title: "Meeting Notes Summarizer", desc: "Turn messy notes into clear summaries", icon: FileText },
-    { id: "tasks", title: "AI Task Planner", desc: "Break goals into actionable plans", icon: ListChecks },
-    { id: "research", title: "AI Research Assistant", desc: "Upload a document or ask a question", icon: Search },
-    { id: "chatbot", title: "AI Chatbot", desc: "A general assistant for quick help", icon: MessageSquare },
+    {
+      id: "email",
+      title: "Smart Email Generator",
+      desc: "Draft polished emails in seconds",
+      icon: Mail,
+    },
+    {
+      id: "meetings",
+      title: "Meeting Notes Summarizer",
+      desc: "Turn messy notes into clear summaries",
+      icon: FileText,
+    },
+    {
+      id: "tasks",
+      title: "AI Task Planner",
+      desc: "Break goals into actionable plans",
+      icon: ListChecks,
+    },
+    {
+      id: "research",
+      title: "AI Research Assistant",
+      desc: "Upload a document or ask a question",
+      icon: Search,
+    },
+    {
+      id: "chatbot",
+      title: "AI Chatbot",
+      desc: "A general assistant for quick help",
+      icon: MessageSquare,
+    },
   ];
   return (
     <div className="space-y-6">
@@ -669,7 +731,15 @@ function DashboardView({ onNavigate, userName }) {
   );
 }
 
-const EMAIL_DEFAULT = { recipient: "", purpose: "", points: "", tone: "Professional", length: "Medium", output: "", error: "" };
+const EMAIL_DEFAULT = {
+  recipient: "",
+  purpose: "",
+  points: "",
+  tone: "Professional",
+  length: "Medium",
+  output: "",
+  error: "",
+};
 
 function EmailGeneratorView() {
   const [s, setS] = usePersistentState("aiw_email", EMAIL_DEFAULT);
@@ -677,7 +747,9 @@ function EmailGeneratorView() {
   const patch = (p) => setS((prev) => ({ ...prev, ...p }));
   const uid = useId();
 
-  useRestoreListener("email", (entry) => setS((prev) => ({ ...prev, ...entry.inputs, output: entry.output, error: "" })));
+  useRestoreListener("email", (entry) =>
+    setS((prev) => ({ ...prev, ...entry.inputs, output: entry.output, error: "" })),
+  );
 
   const generate = async () => {
     if (!s.purpose.trim()) return;
@@ -694,8 +766,14 @@ function EmailGeneratorView() {
       addHistoryEntry(
         "email",
         s.recipient ? `To ${s.recipient}` : s.purpose,
-        { recipient: s.recipient, purpose: s.purpose, points: s.points, tone: s.tone, length: s.length },
-        result.text
+        {
+          recipient: s.recipient,
+          purpose: s.purpose,
+          points: s.points,
+          tone: s.tone,
+          length: s.length,
+        },
+        result.text,
       );
     }
     setLoading(false);
@@ -703,8 +781,15 @@ function EmailGeneratorView() {
 
   return (
     <div className="space-y-5">
-      <ViewHeader icon={Mail} title="Smart Email Generator" subtitle="Describe what you need to say — get a polished, ready-to-send draft." />
-      <HistoryList tool="email" onRestore={(entry) => patch({ ...entry.inputs, output: entry.output, error: "" })} />
+      <ViewHeader
+        icon={Mail}
+        title="Smart Email Generator"
+        subtitle="Describe what you need to say — get a polished, ready-to-send draft."
+      />
+      <HistoryList
+        tool="email"
+        onRestore={(entry) => patch({ ...entry.inputs, output: entry.output, error: "" })}
+      />
       <div className="grid gap-5 lg:grid-cols-2">
         <div className={`${PANEL_CLASS} space-y-4`}>
           <div>
@@ -720,16 +805,35 @@ function EmailGeneratorView() {
           </div>
           <div>
             <FieldLabel htmlFor={`${uid}-purpose`}>Purpose / context</FieldLabel>
-            <TextArea id={`${uid}-purpose`} value={s.purpose} onChange={(v) => patch({ purpose: v })} rows={4} maxLength={2000} placeholder="e.g. Follow up after our product demo call, address pricing concerns" />
+            <TextArea
+              id={`${uid}-purpose`}
+              value={s.purpose}
+              onChange={(v) => patch({ purpose: v })}
+              rows={4}
+              maxLength={2000}
+              placeholder="e.g. Follow up after our product demo call, address pricing concerns"
+            />
           </div>
           <div>
             <FieldLabel htmlFor={`${uid}-points`}>Key points to include (optional)</FieldLabel>
-            <TextArea id={`${uid}-points`} value={s.points} onChange={(v) => patch({ points: v })} rows={3} maxLength={2000} placeholder="e.g. Offer 10% discount for annual billing, propose a call next Tuesday" />
+            <TextArea
+              id={`${uid}-points`}
+              value={s.points}
+              onChange={(v) => patch({ points: v })}
+              rows={3}
+              maxLength={2000}
+              placeholder="e.g. Offer 10% discount for annual billing, propose a call next Tuesday"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <FieldLabel htmlFor={`${uid}-tone`}>Tone</FieldLabel>
-              <select id={`${uid}-tone`} value={s.tone} onChange={(e) => patch({ tone: e.target.value })} className={FIELD_CLASS}>
+              <select
+                id={`${uid}-tone`}
+                value={s.tone}
+                onChange={(e) => patch({ tone: e.target.value })}
+                className={FIELD_CLASS}
+              >
                 {["Professional", "Friendly", "Formal", "Persuasive", "Apologetic"].map((t) => (
                   <option key={t}>{t}</option>
                 ))}
@@ -737,18 +841,31 @@ function EmailGeneratorView() {
             </div>
             <div>
               <FieldLabel htmlFor={`${uid}-length`}>Length</FieldLabel>
-              <select id={`${uid}-length`} value={s.length} onChange={(e) => patch({ length: e.target.value })} className={FIELD_CLASS}>
+              <select
+                id={`${uid}-length`}
+                value={s.length}
+                onChange={(e) => patch({ length: e.target.value })}
+                className={FIELD_CLASS}
+              >
                 {["Short", "Medium", "Long"].map((t) => (
                   <option key={t}>{t}</option>
                 ))}
               </select>
             </div>
           </div>
-          <button onClick={generate} disabled={loading || !s.purpose.trim()} className={`${BTN_PRIMARY} w-full`}>
+          <button
+            onClick={generate}
+            disabled={loading || !s.purpose.trim()}
+            className={`${BTN_PRIMARY} w-full`}
+          >
             {loading ? <Loader2 className="animate-spin" size={15} /> : <Mail size={15} />}
             {loading ? "Generating..." : "Generate email"}
           </button>
-          <ErrorBanner message={s.error} onRetry={generate} onDismiss={() => patch({ error: "" })} />
+          <ErrorBanner
+            message={s.error}
+            onRetry={generate}
+            onDismiss={() => patch({ error: "" })}
+          />
         </div>
         <OutputPanel
           icon={Mail}
@@ -778,9 +895,13 @@ function MeetingSummarizerView() {
   const patch = (p) => setS((prev) => ({ ...prev, ...p }));
   const uid = useId();
   const recordingSupported =
-    typeof window !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
+    typeof window !== "undefined" &&
+    !!navigator.mediaDevices?.getUserMedia &&
+    typeof MediaRecorder !== "undefined";
 
-  useRestoreListener("meetings", (entry) => setS((prev) => ({ ...prev, ...entry.inputs, output: entry.output, error: "" })));
+  useRestoreListener("meetings", (entry) =>
+    setS((prev) => ({ ...prev, ...entry.inputs, output: entry.output, error: "" })),
+  );
 
   // Stop the mic and timer if the user navigates away mid-recording —
   // every tool view stays mounted (just hidden) for instant tab
@@ -806,7 +927,10 @@ function MeetingSummarizerView() {
         throw new Error("The server returned an unreadable response.");
       }
       if (!res.ok) throw new Error(data.error || "Couldn't transcribe that recording.");
-      setS((prev) => ({ ...prev, notes: prev.notes ? `${prev.notes}\n\n${data.text}` : data.text }));
+      setS((prev) => ({
+        ...prev,
+        notes: prev.notes ? `${prev.notes}\n\n${data.text}` : data.text,
+      }));
     } catch (err) {
       setRecordError(err.message || "Couldn't transcribe that recording.");
     } finally {
@@ -819,14 +943,19 @@ function MeetingSummarizerView() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = pickRecorderMimeType();
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: RECORD_BITS_PER_SECOND } : undefined);
+      const recorder = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType, audioBitsPerSecond: RECORD_BITS_PER_SECOND } : undefined,
+      );
       const chunks = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
       };
       recorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
-        transcribeRecording(new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" }));
+        transcribeRecording(
+          new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" }),
+        );
       };
       recorderRef.current = recorder;
       recorder.start();
@@ -842,7 +971,7 @@ function MeetingSummarizerView() {
       setRecordError(
         err?.name === "NotAllowedError"
           ? "Microphone access was denied — allow microphone access in your browser to record."
-          : "Couldn't access your microphone. Check your device settings and try again."
+          : "Couldn't access your microphone. Check your device settings and try again.",
       );
     }
   };
@@ -865,15 +994,27 @@ function MeetingSummarizerView() {
       patch({ error: result.error });
     } else {
       patch({ output: result.text, error: "" });
-      addHistoryEntry("meetings", s.notes.split("\n")[0] || s.style, { notes: s.notes, style: s.style }, result.text);
+      addHistoryEntry(
+        "meetings",
+        s.notes.split("\n")[0] || s.style,
+        { notes: s.notes, style: s.style },
+        result.text,
+      );
     }
     setLoading(false);
   };
 
   return (
     <div className="space-y-5">
-      <ViewHeader icon={FileText} title="Meeting Notes Summarizer" subtitle="Paste raw notes or a transcript — get a clean summary with action items." />
-      <HistoryList tool="meetings" onRestore={(entry) => patch({ ...entry.inputs, output: entry.output, error: "" })} />
+      <ViewHeader
+        icon={FileText}
+        title="Meeting Notes Summarizer"
+        subtitle="Paste raw notes or a transcript — get a clean summary with action items."
+      />
+      <HistoryList
+        tool="meetings"
+        onRestore={(entry) => patch({ ...entry.inputs, output: entry.output, error: "" })}
+      />
       <div className="grid gap-5 lg:grid-cols-2">
         <div className={`${PANEL_CLASS} space-y-4`}>
           {recordingSupported && (
@@ -906,28 +1047,48 @@ function MeetingSummarizerView() {
               )}
               {recordError && <p className="mt-1 text-xs text-red-600">{recordError}</p>}
               <p className="mt-1 text-xs text-stone-400">
-                The recording is sent to the AI to transcribe and isn't stored anywhere — only the resulting text
-                below is kept. Max {MAX_RECORD_SECONDS / 60} minutes.
+                The recording is sent to the AI to transcribe and isn't stored anywhere — only the
+                resulting text below is kept. Max {MAX_RECORD_SECONDS / 60} minutes.
               </p>
             </div>
           )}
           <div>
             <FieldLabel htmlFor={`${uid}-notes`}>Raw notes or transcript</FieldLabel>
-            <TextArea id={`${uid}-notes`} value={s.notes} onChange={(v) => patch({ notes: v })} rows={12} maxLength={8000} placeholder="Paste your meeting notes, transcript, or rough bullet points here — or record above." />
+            <TextArea
+              id={`${uid}-notes`}
+              value={s.notes}
+              onChange={(v) => patch({ notes: v })}
+              rows={12}
+              maxLength={8000}
+              placeholder="Paste your meeting notes, transcript, or rough bullet points here — or record above."
+            />
           </div>
           <div>
             <FieldLabel htmlFor={`${uid}-style`}>Summary style</FieldLabel>
-            <select id={`${uid}-style`} value={s.style} onChange={(e) => patch({ style: e.target.value })} className={FIELD_CLASS}>
+            <select
+              id={`${uid}-style`}
+              value={s.style}
+              onChange={(e) => patch({ style: e.target.value })}
+              className={FIELD_CLASS}
+            >
               {["Action items focus", "Executive summary", "Detailed bullet points"].map((t) => (
                 <option key={t}>{t}</option>
               ))}
             </select>
           </div>
-          <button onClick={generate} disabled={loading || !s.notes.trim()} className={`${BTN_PRIMARY} w-full`}>
+          <button
+            onClick={generate}
+            disabled={loading || !s.notes.trim()}
+            className={`${BTN_PRIMARY} w-full`}
+          >
             {loading ? <Loader2 className="animate-spin" size={15} /> : <FileText size={15} />}
             {loading ? "Summarizing..." : "Summarize notes"}
           </button>
-          <ErrorBanner message={s.error} onRetry={generate} onDismiss={() => patch({ error: "" })} />
+          <ErrorBanner
+            message={s.error}
+            onRetry={generate}
+            onDismiss={() => patch({ error: "" })}
+          />
         </div>
         <OutputPanel
           icon={FileText}
@@ -951,7 +1112,9 @@ function TaskPlannerView() {
   const patch = (p) => setS((prev) => ({ ...prev, ...p }));
   const uid = useId();
 
-  useRestoreListener("tasks", (entry) => setS((prev) => ({ ...prev, ...entry.inputs, output: entry.output, error: "" })));
+  useRestoreListener("tasks", (entry) =>
+    setS((prev) => ({ ...prev, ...entry.inputs, output: entry.output, error: "" })),
+  );
 
   const generate = async () => {
     if (!s.goal.trim()) return;
@@ -965,34 +1128,76 @@ function TaskPlannerView() {
       patch({ error: result.error });
     } else {
       patch({ output: result.text, error: "" });
-      addHistoryEntry("tasks", s.goal, { goal: s.goal, deadline: s.deadline, constraints: s.constraints }, result.text);
+      addHistoryEntry(
+        "tasks",
+        s.goal,
+        { goal: s.goal, deadline: s.deadline, constraints: s.constraints },
+        result.text,
+      );
     }
     setLoading(false);
   };
 
   return (
     <div className="space-y-5">
-      <ViewHeader icon={ListChecks} title="AI Task Planner" subtitle="Turn a goal into a prioritized, actionable plan." />
-      <HistoryList tool="tasks" onRestore={(entry) => patch({ ...entry.inputs, output: entry.output, error: "" })} />
+      <ViewHeader
+        icon={ListChecks}
+        title="AI Task Planner"
+        subtitle="Turn a goal into a prioritized, actionable plan."
+      />
+      <HistoryList
+        tool="tasks"
+        onRestore={(entry) => patch({ ...entry.inputs, output: entry.output, error: "" })}
+      />
       <div className="grid gap-5 lg:grid-cols-2">
         <div className={`${PANEL_CLASS} space-y-4`}>
           <div>
             <FieldLabel htmlFor={`${uid}-goal`}>Goal or project</FieldLabel>
-            <TextArea id={`${uid}-goal`} value={s.goal} onChange={(v) => patch({ goal: v })} rows={4} maxLength={2000} placeholder="e.g. Launch our new customer onboarding flow" />
+            <TextArea
+              id={`${uid}-goal`}
+              value={s.goal}
+              onChange={(v) => patch({ goal: v })}
+              rows={4}
+              maxLength={2000}
+              placeholder="e.g. Launch our new customer onboarding flow"
+            />
           </div>
           <div>
             <FieldLabel htmlFor={`${uid}-deadline`}>Deadline (optional)</FieldLabel>
-            <input id={`${uid}-deadline`} type="date" value={s.deadline} onChange={(e) => patch({ deadline: e.target.value })} className={FIELD_CLASS} />
+            <input
+              id={`${uid}-deadline`}
+              type="date"
+              value={s.deadline}
+              onChange={(e) => patch({ deadline: e.target.value })}
+              className={FIELD_CLASS}
+            />
           </div>
           <div>
-            <FieldLabel htmlFor={`${uid}-constraints`}>Constraints or resources (optional)</FieldLabel>
-            <TextArea id={`${uid}-constraints`} value={s.constraints} onChange={(v) => patch({ constraints: v })} rows={3} maxLength={2000} placeholder="e.g. Team of 3, no budget for new tools, must integrate with existing CRM" />
+            <FieldLabel htmlFor={`${uid}-constraints`}>
+              Constraints or resources (optional)
+            </FieldLabel>
+            <TextArea
+              id={`${uid}-constraints`}
+              value={s.constraints}
+              onChange={(v) => patch({ constraints: v })}
+              rows={3}
+              maxLength={2000}
+              placeholder="e.g. Team of 3, no budget for new tools, must integrate with existing CRM"
+            />
           </div>
-          <button onClick={generate} disabled={loading || !s.goal.trim()} className={`${BTN_PRIMARY} w-full`}>
+          <button
+            onClick={generate}
+            disabled={loading || !s.goal.trim()}
+            className={`${BTN_PRIMARY} w-full`}
+          >
             {loading ? <Loader2 className="animate-spin" size={15} /> : <ListChecks size={15} />}
             {loading ? "Planning..." : "Generate plan"}
           </button>
-          <ErrorBanner message={s.error} onRetry={generate} onDismiss={() => patch({ error: "" })} />
+          <ErrorBanner
+            message={s.error}
+            onRetry={generate}
+            onDismiss={() => patch({ error: "" })}
+          />
         </div>
         <OutputPanel
           icon={ListChecks}
@@ -1062,7 +1267,7 @@ function ResearchAssistantView() {
       fileTruncated: false,
       output: entry.output,
       error: "",
-    }))
+    })),
   );
 
   const generate = async () => {
@@ -1081,18 +1286,35 @@ function ResearchAssistantView() {
       patch({ error: result.error });
     } else {
       patch({ output: result.text, error: "" });
-      addHistoryEntry("research", s.topic, { topic: s.topic, depth: s.depth, fileName: s.fileName }, result.text);
+      addHistoryEntry(
+        "research",
+        s.topic,
+        { topic: s.topic, depth: s.depth, fileName: s.fileName },
+        result.text,
+      );
     }
     setLoading(false);
   };
 
   return (
     <div className="space-y-5">
-      <ViewHeader icon={Search} title="AI Research Assistant" subtitle="Ask a question, optionally grounded in an uploaded document — get a structured brief." />
+      <ViewHeader
+        icon={Search}
+        title="AI Research Assistant"
+        subtitle="Ask a question, optionally grounded in an uploaded document — get a structured brief."
+      />
       <HistoryList
         tool="research"
         onRestore={(entry) =>
-          patch({ topic: entry.inputs.topic, depth: entry.inputs.depth, fileName: "", fileText: "", fileTruncated: false, output: entry.output, error: "" })
+          patch({
+            topic: entry.inputs.topic,
+            depth: entry.inputs.depth,
+            fileName: "",
+            fileText: "",
+            fileTruncated: false,
+            output: entry.output,
+            error: "",
+          })
         }
       />
       <div className="grid gap-5 lg:grid-cols-2">
@@ -1104,7 +1326,11 @@ function ResearchAssistantView() {
                 htmlFor={`${uid}-file`}
                 className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-stone-300 px-3 py-4 text-sm text-stone-500 transition hover:border-stone-400 hover:bg-stone-50"
               >
-                {fileBusy ? <Loader2 className="animate-spin" size={15} /> : <Paperclip size={15} />}
+                {fileBusy ? (
+                  <Loader2 className="animate-spin" size={15} />
+                ) : (
+                  <Paperclip size={15} />
+                )}
                 {fileBusy ? "Reading file..." : "Upload a PDF, .txt, or .md file"}
                 <input
                   id={`${uid}-file`}
@@ -1121,7 +1347,11 @@ function ResearchAssistantView() {
                   <FileText size={15} className="text-stone-700" />
                   <span className="truncate text-stone-900">{s.fileName}</span>
                 </div>
-                <button onClick={removeFile} aria-label="Remove file" className="shrink-0 text-stone-400 hover:text-stone-600">
+                <button
+                  onClick={removeFile}
+                  aria-label="Remove file"
+                  className="shrink-0 text-stone-400 hover:text-stone-600"
+                >
                   <X size={14} />
                 </button>
               </div>
@@ -1135,21 +1365,41 @@ function ResearchAssistantView() {
           </div>
           <div>
             <FieldLabel htmlFor={`${uid}-topic`}>Research question or topic</FieldLabel>
-            <TextArea id={`${uid}-topic`} value={s.topic} onChange={(v) => patch({ topic: v })} rows={5} maxLength={2000} placeholder="e.g. Summarize the key risks in this document, or: What are the main pricing models for B2B SaaS?" />
+            <TextArea
+              id={`${uid}-topic`}
+              value={s.topic}
+              onChange={(v) => patch({ topic: v })}
+              rows={5}
+              maxLength={2000}
+              placeholder="e.g. Summarize the key risks in this document, or: What are the main pricing models for B2B SaaS?"
+            />
           </div>
           <div>
             <FieldLabel htmlFor={`${uid}-depth`}>Depth</FieldLabel>
-            <select id={`${uid}-depth`} value={s.depth} onChange={(e) => patch({ depth: e.target.value })} className={FIELD_CLASS}>
+            <select
+              id={`${uid}-depth`}
+              value={s.depth}
+              onChange={(e) => patch({ depth: e.target.value })}
+              className={FIELD_CLASS}
+            >
               {["Quick overview", "Detailed analysis"].map((t) => (
                 <option key={t}>{t}</option>
               ))}
             </select>
           </div>
-          <button onClick={generate} disabled={loading || !s.topic.trim()} className={`${BTN_PRIMARY} w-full`}>
+          <button
+            onClick={generate}
+            disabled={loading || !s.topic.trim()}
+            className={`${BTN_PRIMARY} w-full`}
+          >
             {loading ? <Loader2 className="animate-spin" size={15} /> : <Search size={15} />}
             {loading ? "Researching..." : "Research this"}
           </button>
-          <ErrorBanner message={s.error} onRetry={generate} onDismiss={() => patch({ error: "" })} />
+          <ErrorBanner
+            message={s.error}
+            onRetry={generate}
+            onDismiss={() => patch({ error: "" })}
+          />
         </div>
         <OutputPanel
           icon={Search}
@@ -1166,7 +1416,11 @@ function ResearchAssistantView() {
 }
 
 const CHAT_DEFAULT = [
-  { role: "assistant", content: "Hi! I'm your workplace AI assistant. Ask me anything — from drafting a quick reply to thinking through a decision." },
+  {
+    role: "assistant",
+    content:
+      "Hi! I'm your workplace AI assistant. Ask me anything — from drafting a quick reply to thinking through a decision.",
+  },
 ];
 
 const CHAT_STARTERS = [
@@ -1215,9 +1469,17 @@ function ChatbotView() {
 
   return (
     <div className="space-y-5">
-      <ViewHeader icon={MessageSquare} title="AI Chatbot" subtitle="A general assistant for quick questions and everyday work." />
+      <ViewHeader
+        icon={MessageSquare}
+        title="AI Chatbot"
+        subtitle="A general assistant for quick questions and everyday work."
+      />
       <div className="flex flex-col rounded-xl border border-stone-200 bg-white shadow-sm">
-        <div ref={scrollRef} className="aiw-scroll space-y-4 overflow-y-auto p-5" style={{ maxHeight: "480px", minHeight: "360px" }}>
+        <div
+          ref={scrollRef}
+          className="aiw-scroll space-y-4 overflow-y-auto p-5"
+          style={{ maxHeight: "480px", minHeight: "360px" }}
+        >
           {messages.map((m, i) => (
             <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
@@ -1258,7 +1520,9 @@ function ChatbotView() {
         )}
         <div className="border-t border-stone-200 p-4">
           <div className="flex items-end gap-2">
-            <label htmlFor={`${uid}-chat-input`} className="sr-only">Message</label>
+            <label htmlFor={`${uid}-chat-input`} className="sr-only">
+              Message
+            </label>
             <textarea
               id={`${uid}-chat-input`}
               value={input}
@@ -1351,7 +1615,10 @@ function AppShell({ user, onSignOut }) {
   return (
     <div className="flex h-screen overflow-hidden bg-stone-100">
       {mobileNavOpen && (
-        <div className="fixed inset-0 z-40 bg-stone-900/30 lg:hidden" onClick={() => setMobileNavOpen(false)} />
+        <div
+          className="fixed inset-0 z-40 bg-stone-900/30 lg:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
       )}
 
       <aside
@@ -1393,7 +1660,9 @@ function AppShell({ user, onSignOut }) {
         <div className="mx-3 mt-5 flex flex-1 flex-col rounded-lg bg-white p-3 shadow-md">
           <div className="mb-2 flex items-center gap-2">
             <History size={13} className="text-emerald-700" />
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">Recent</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+              Recent
+            </p>
           </div>
           {recent.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center py-4 text-center">
@@ -1415,8 +1684,12 @@ function AppShell({ user, onSignOut }) {
                     className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition hover:bg-stone-50"
                   >
                     <Icon size={13} className="shrink-0 text-stone-400" />
-                    <span className="min-w-0 flex-1 truncate text-xs text-stone-700">{item.label}</span>
-                    <span className="shrink-0 text-[10px] text-stone-300">{relativeTime(item.timestamp)}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-stone-700">
+                      {item.label}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-stone-300">
+                      {relativeTime(item.timestamp)}
+                    </span>
                   </button>
                 );
               })}
@@ -1432,7 +1705,9 @@ function AppShell({ user, onSignOut }) {
               {initialsOf(user.name)}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white" title={user.name}>{user.name}</p>
+              <p className="truncate text-sm font-medium text-white" title={user.name}>
+                {user.name}
+              </p>
               <p className="truncate text-xs text-stone-400">
                 {user.company || user.email || "Local workspace"}
               </p>
@@ -1449,7 +1724,11 @@ function AppShell({ user, onSignOut }) {
 
       <div className="flex h-full flex-1 flex-col overflow-hidden">
         <header className="flex items-center gap-3 border-b border-stone-200 bg-white px-4 py-3 lg:hidden">
-          <button onClick={() => setMobileNavOpen(true)} aria-label="Open navigation menu" className="text-stone-700">
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open navigation menu"
+            className="text-stone-700"
+          >
             <Menu size={20} />
           </button>
           <span className="text-sm font-semibold text-stone-900">Deskmate AI</span>

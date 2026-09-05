@@ -32,20 +32,31 @@ export default function SignIn({ onComplete }) {
       <div className="w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center text-center">
           <LogoMark size={56} />
-          <h1 className="mt-4 text-xl font-bold tracking-tight text-stone-900">Create your workspace</h1>
+          <h1 className="mt-4 text-xl font-bold tracking-tight text-stone-900">
+            Create your workspace
+          </h1>
           <p className="mt-1.5 text-sm text-stone-500">
             A few details to personalize Deskmate AI — no password required.
           </p>
         </div>
 
-        <form onSubmit={submit} className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+        <form
+          onSubmit={submit}
+          className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"
+        >
           <div className="space-y-4">
             <div>
-              <label htmlFor={`${uid}-name`} className="mb-1.5 block text-sm font-medium text-stone-700">
+              <label
+                htmlFor={`${uid}-name`}
+                className="mb-1.5 block text-sm font-medium text-stone-700"
+              >
                 Full name
               </label>
               <div className="relative">
-                <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <User
+                  size={15}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                />
                 <input
                   id={`${uid}-name`}
                   autoFocus
@@ -58,11 +69,17 @@ export default function SignIn({ onComplete }) {
               </div>
             </div>
             <div>
-              <label htmlFor={`${uid}-email`} className="mb-1.5 block text-sm font-medium text-stone-700">
+              <label
+                htmlFor={`${uid}-email`}
+                className="mb-1.5 block text-sm font-medium text-stone-700"
+              >
                 Work email <span className="font-normal text-stone-400">(optional)</span>
               </label>
               <div className="relative">
-                <Mail size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <Mail
+                  size={15}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                />
                 <input
                   id={`${uid}-email`}
                   type="email"
@@ -75,11 +92,17 @@ export default function SignIn({ onComplete }) {
               </div>
             </div>
             <div>
-              <label htmlFor={`${uid}-company`} className="mb-1.5 block text-sm font-medium text-stone-700">
+              <label
+                htmlFor={`${uid}-company`}
+                className="mb-1.5 block text-sm font-medium text-stone-700"
+              >
                 Company <span className="font-normal text-stone-400">(optional)</span>
               </label>
               <div className="relative">
-                <Building2 size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <Building2
+                  size={15}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                />
                 <input
                   id={`${uid}-company`}
                   value={company}
@@ -100,8 +123,8 @@ export default function SignIn({ onComplete }) {
             Create workspace <ArrowRight size={15} />
           </button>
           <p className="mt-4 text-center text-xs leading-relaxed text-stone-400">
-            Nothing here is verified or sent to a server — these details stay in this browser
-            and only personalize what you see.
+            Nothing here is verified or sent to a server — these details stay in this browser and
+            only personalize what you see.
           </p>
         </form>
       </div>

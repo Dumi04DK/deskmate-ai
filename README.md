@@ -12,7 +12,7 @@ card required for either.
 
 ## 🚀 Day 1 — get it running locally
 
-*(aim: 2–3 hours)*
+_(aim: 2–3 hours)_
 
 1. **Install Node.js 18+** if you don't have it → https://nodejs.org
 2. **Install dependencies**
@@ -46,7 +46,7 @@ card required for either.
 
 ## 🌐 Day 2 — deploy it live, still free
 
-*(aim: half a day)*
+_(aim: half a day)_
 
 1. **Push to GitHub**
    ```bash
@@ -81,10 +81,10 @@ Nothing here costs money, but "free" comes with real limits:
 - **🔓 Data usage.** On the free tier, Google may use the prompts and
   outputs sent through the API to improve their models. Don't put real
   confidential company information through this until you've moved to
-  a paid tier, which turns that off. *(There is currently no in-app
+  a paid tier, which turns that off. _(There is currently no in-app
   warning about this — it was intentionally removed. If this goes
   anywhere beyond a personal/assignment context, put one back or move
-  to the paid tier first.)*
+  to the paid tier first.)_
 - **🔁 Model churn.** Google retires free-tier models fairly often (several
   models were deprecated in 2026 alone). If `/api/ai` starts erroring
   with a "model not found"-style message, check
