@@ -20,10 +20,11 @@
 --
 -- Covers both AI endpoints the app calls: /api/ai (text — email,
 -- meeting, task, research, chat) and /api/transcribe (audio — the
--- Meeting Summarizer's "Record a meeting" button). Recorded audio
--- itself is never stored anywhere, in this schema or otherwise —
--- only the transcript text that comes back, same as everything else
--- in `generations`.
+-- Meeting Summarizer's "Record a meeting" button). The transcript text
+-- always lands in `generations` like everything else; the original
+-- recording itself is kept too, in the private `meeting-recordings`
+-- storage bucket (see the "Storage" section below), referenced by
+-- `generations.audio_path`.
 --
 -- Auth itself is NOT a table you create — Supabase Auth already
 -- manages `auth.users` (email/password, magic link, OAuth, etc. — pick
@@ -111,6 +112,11 @@ create table if not exists public.generations (
   -- doesn't need a migration if another tool grows an alternate input
   -- path later.
   source text not null default 'typed' check (source in ('typed', 'recording', 'upload')),
+  -- Path of the original recording in the meeting-recordings storage
+  -- bucket below (see "Storage" section) — only set for 'meetings' rows
+  -- where source = 'recording'. Every other row leaves this null: audio
+  -- is never stored for typed input or the other three tools.
+  audio_path text,
   created_at timestamptz not null default now()
 );
 
@@ -120,6 +126,39 @@ create index if not exists generations_user_created_idx
   on public.generations (user_id, created_at desc);
 create index if not exists generations_user_tool_created_idx
   on public.generations (user_id, tool, created_at desc);
+
+-- ---------------------------------------------------------------
+-- Storage — a private bucket for the Meeting Summarizer's recorded
+-- audio. Previously recordings were transcribed and immediately
+-- discarded; this keeps the original file so it can be played back
+-- later. Objects are keyed "<user_id>/<filename>", and the RLS
+-- policies below use that first path segment to scope every read/
+-- write/delete to the owning user — the same pattern as every other
+-- table in this file, just expressed via storage.foldername() instead
+-- of a user_id column.
+-- ---------------------------------------------------------------
+
+insert into storage.buckets (id, name, public)
+values ('meeting-recordings', 'meeting-recordings', false)
+on conflict (id) do nothing;
+
+drop policy if exists "meeting_recordings_select_own" on storage.objects;
+create policy "meeting_recordings_select_own" on storage.objects
+  for select using (
+    bucket_id = 'meeting-recordings' and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "meeting_recordings_insert_own" on storage.objects;
+create policy "meeting_recordings_insert_own" on storage.objects
+  for insert with check (
+    bucket_id = 'meeting-recordings' and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "meeting_recordings_delete_own" on storage.objects;
+create policy "meeting_recordings_delete_own" on storage.objects
+  for delete using (
+    bucket_id = 'meeting-recordings' and (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 -- ---------------------------------------------------------------
 -- chat_threads / chat_messages — the AI Chatbot's conversations.

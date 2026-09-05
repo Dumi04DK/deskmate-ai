@@ -11,6 +11,7 @@ import {
   Copy,
   Download,
   ChevronDown,
+  Play,
   RefreshCw,
   Send,
   Menu,
@@ -111,11 +112,13 @@ const HISTORY_EVENT = "aiw:history-updated";
 const RESTORE_EVENT = "aiw:restore-entry";
 const MAX_HISTORY = 50;
 
+const RECORDINGS_BUCKET = "meeting-recordings";
+
 async function fetchGenerations(tool) {
   const supabase = createClient();
   let query = supabase
     .from("generations")
-    .select("id, tool, label, inputs, output, source, created_at")
+    .select("id, tool, label, inputs, output, source, audio_path, created_at")
     .order("created_at", { ascending: false })
     .limit(MAX_HISTORY);
   if (tool) query = query.eq("tool", tool);
@@ -127,7 +130,7 @@ async function fetchGenerations(tool) {
   return data.map((row) => ({ ...row, timestamp: new Date(row.created_at).getTime() }));
 }
 
-async function addHistoryEntry(tool, label, inputs, output, source = "typed") {
+async function addHistoryEntry(tool, label, inputs, output, source = "typed", audioPath = null) {
   const supabase = createClient();
   const {
     data: { user },
@@ -140,13 +143,18 @@ async function addHistoryEntry(tool, label, inputs, output, source = "typed") {
     inputs,
     output,
     source,
+    audio_path: audioPath,
   });
   window.dispatchEvent(new Event(HISTORY_EVENT));
 }
 
-async function removeHistoryEntry(id) {
+// audioPath is optional — pass it (from the entry being removed) so its
+// recording gets cleaned up from Storage too, rather than left behind
+// as an orphaned file counting against the project's storage quota.
+async function removeHistoryEntry(id, audioPath = null) {
   const supabase = createClient();
   await supabase.from("generations").delete().eq("id", id);
+  if (audioPath) await supabase.storage.from(RECORDINGS_BUCKET).remove([audioPath]);
   window.dispatchEvent(new Event(HISTORY_EVENT));
 }
 
@@ -583,6 +591,41 @@ function OutputPanel({
 // Past generations for one tool, shown beneath its two-column layout so
 // nothing generated is ever lost to a "Regenerate" click — click any
 // entry to load it back into the form and output panel.
+// The recordings bucket is private, so playback needs a fresh signed
+// URL each time rather than a plain public link — fetched lazily, only
+// once the user actually asks to hear it, and only kept around for a
+// couple of minutes (past which a re-click just fetches a new one).
+function RecordingPlayButton({ path }) {
+  const [url, setUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const play = async (e) => {
+    e.stopPropagation();
+    if (url) return;
+    setLoading(true);
+    const supabase = createClient();
+    const { data } = await supabase.storage.from(RECORDINGS_BUCKET).createSignedUrl(path, 120);
+    setLoading(false);
+    if (data?.signedUrl) setUrl(data.signedUrl);
+  };
+
+  if (url) {
+    return (
+      <audio controls autoPlay src={url} className="mt-1 h-8 w-full" style={{ maxWidth: 220 }} />
+    );
+  }
+  return (
+    <button
+      onClick={play}
+      disabled={loading}
+      className="mt-1 flex items-center gap-1 text-[10px] font-medium text-emerald-700 hover:text-emerald-900"
+    >
+      {loading ? <Loader2 className="animate-spin" size={11} /> : <Play size={11} />}
+      Play recording
+    </button>
+  );
+}
+
 function HistoryList({ tool, onRestore }) {
   const items = useHistory(tool);
   if (items.length === 0) return null;
@@ -600,19 +643,22 @@ function HistoryList({ tool, onRestore }) {
             key={item.id}
             className="group relative flex items-start gap-2 rounded-lg border border-stone-200 p-2.5 text-left transition hover:border-stone-300 hover:bg-stone-50"
           >
-            <button onClick={() => onRestore(item)} className="min-w-0 flex-1 text-left">
-              <p className="truncate text-sm font-medium text-stone-900">{item.label}</p>
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-stone-400">
-                <Clock size={11} /> {relativeTime(item.timestamp)}
-                {item.inputs?.fileName && (
-                  <span className="flex items-center gap-0.5 truncate">
-                    <Paperclip size={11} /> {item.inputs.fileName}
-                  </span>
-                )}
-              </p>
-            </button>
+            <div className="min-w-0 flex-1">
+              <button onClick={() => onRestore(item)} className="w-full text-left">
+                <p className="truncate text-sm font-medium text-stone-900">{item.label}</p>
+                <p className="mt-0.5 flex items-center gap-1 text-xs text-stone-400">
+                  <Clock size={11} /> {relativeTime(item.timestamp)}
+                  {item.inputs?.fileName && (
+                    <span className="flex items-center gap-0.5 truncate">
+                      <Paperclip size={11} /> {item.inputs.fileName}
+                    </span>
+                  )}
+                </p>
+              </button>
+              {item.audio_path && <RecordingPlayButton path={item.audio_path} />}
+            </div>
             <button
-              onClick={() => removeHistoryEntry(item.id)}
+              onClick={() => removeHistoryEntry(item.id, item.audio_path)}
               aria-label="Delete from history"
               className="shrink-0 rounded p-0.5 text-stone-300 opacity-0 transition hover:text-stone-600 group-hover:opacity-100"
             >
@@ -1033,7 +1079,21 @@ function EmailGeneratorView() {
   );
 }
 
-const MEETING_DEFAULT = { notes: "", style: "Action items focus", output: "", error: "" };
+const MEETING_DEFAULT = {
+  notes: "",
+  style: "Action items focus",
+  output: "",
+  error: "",
+  audioPath: "",
+};
+
+// audio/webm -> "webm", audio/mp4 -> "mp4", etc. — falls back to
+// "webm" (this recorder's actual default) if the mime type is ever
+// missing or shaped unexpectedly.
+function extensionForMimeType(mimeType) {
+  const match = /audio\/([a-z0-9]+)/i.exec(mimeType || "");
+  return match ? match[1] : "webm";
+}
 
 function MeetingSummarizerView() {
   const [s, setS] = usePersistentState("aiw_meetings", MEETING_DEFAULT);
@@ -1052,7 +1112,13 @@ function MeetingSummarizerView() {
     typeof MediaRecorder !== "undefined";
 
   useRestoreListener("meetings", (entry) =>
-    setS((prev) => ({ ...prev, ...entry.inputs, output: entry.output, error: "" })),
+    setS((prev) => ({
+      ...prev,
+      ...entry.inputs,
+      output: entry.output,
+      error: "",
+      audioPath: entry.audio_path || "",
+    })),
   );
 
   // Stop the mic and timer if the user navigates away mid-recording —
@@ -1083,10 +1149,35 @@ function MeetingSummarizerView() {
         ...prev,
         notes: prev.notes ? `${prev.notes}\n\n${data.text}` : data.text,
       }));
+      await uploadRecording(blob);
     } catch (err) {
       setRecordError(err.message || "Couldn't transcribe that recording.");
     } finally {
       setTranscribing(false);
+    }
+  };
+
+  // Uploads the just-transcribed recording to the user's own folder in
+  // the private meeting-recordings bucket, so it can be played back
+  // later from History — separate from transcribeRecording so a
+  // failed upload (network hiccup, storage quota, whatever) never
+  // blocks the transcript itself from landing in `notes` above.
+  const uploadRecording = async (blob) => {
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const path = `${user.id}/${Date.now()}.${extensionForMimeType(blob.type)}`;
+      const { error } = await supabase.storage
+        .from(RECORDINGS_BUCKET)
+        .upload(path, blob, { contentType: blob.type || "audio/webm" });
+      if (!error) patch({ audioPath: path });
+    } catch {
+      /* the transcript already made it into `notes` — losing the
+         playable recording itself is a lesser failure, not worth
+         surfacing as an error to the user */
     }
   };
 
@@ -1158,6 +1249,8 @@ function MeetingSummarizerView() {
         s.notes.split("\n")[0] || s.style,
         { notes: s.notes, style: s.style },
         result.text,
+        s.audioPath ? "recording" : "typed",
+        s.audioPath || null,
       );
     }
     setLoading(false);
@@ -1172,7 +1265,14 @@ function MeetingSummarizerView() {
       />
       <HistoryList
         tool="meetings"
-        onRestore={(entry) => patch({ ...entry.inputs, output: entry.output, error: "" })}
+        onRestore={(entry) =>
+          patch({
+            ...entry.inputs,
+            output: entry.output,
+            error: "",
+            audioPath: entry.audio_path || "",
+          })
+        }
       />
       <div className="grid gap-5 lg:grid-cols-2">
         <div className={`${PANEL_CLASS} space-y-4`}>
@@ -1206,8 +1306,8 @@ function MeetingSummarizerView() {
               )}
               {recordError && <p className="mt-1 text-xs text-red-600">{recordError}</p>}
               <p className="mt-1 text-xs text-stone-400">
-                The recording is sent to the AI to transcribe and isn't stored anywhere — only the
-                resulting text below is kept. Max {MAX_RECORD_SECONDS / 60} minutes.
+                The recording is sent to the AI to transcribe, then saved so you can play it back
+                later from History — only you can access it. Max {MAX_RECORD_SECONDS / 60} minutes.
               </p>
             </div>
           )}
