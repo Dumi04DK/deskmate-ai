@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Copy,
   Download,
+  ChevronDown,
   RefreshCw,
   Send,
   Menu,
@@ -365,13 +366,75 @@ function ViewHeader({ icon: Icon, title, subtitle }) {
 
 // Turns a panel title into a safe filename fragment, e.g. "Generated
 // email" -> "generated-email". Downloaded files are named
-// "<slug>-<yyyy-mm-dd>.txt" so re-downloading later doesn't silently
+// "<slug>-<yyyy-mm-dd>.<ext>" so re-downloading later doesn't silently
 // overwrite an earlier one from the same day at a glance.
 function slugify(title) {
   return (title || "output")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+function triggerBlobDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// jsPDF and docx are both sizeable — loaded on demand (same pattern as
+// pdfjs-dist in extractFileText below) rather than in the main bundle,
+// since most sessions never click either download option.
+async function downloadAsPdf(text, title, filename) {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const margin = 48;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const maxWidth = pageWidth - margin * 2;
+  const lineHeight = 16;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text(title, margin, margin);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  let y = margin + 28;
+  for (const paragraph of (text || "").split("\n")) {
+    const lines = paragraph ? doc.splitTextToSize(paragraph, maxWidth) : [""];
+    for (const line of lines) {
+      if (y > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(line, margin, y);
+      y += lineHeight;
+    }
+  }
+  doc.save(filename);
+}
+
+async function downloadAsWord(text, title, filename) {
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun(title)] }),
+          ...(text || "")
+            .split("\n")
+            .map((line) => new Paragraph({ children: [new TextRun(line)] })),
+        ],
+      },
+    ],
+  });
+  const blob = await Packer.toBlob(doc);
+  triggerBlobDownload(blob, filename);
 }
 
 function OutputPanel({
@@ -385,23 +448,42 @@ function OutputPanel({
   tips,
 }) {
   const [copied, setCopied] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const downloadMenuRef = useRef(null);
   const handleCopy = () => {
     if (navigator.clipboard) navigator.clipboard.writeText(value || "");
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
-  const handleDownload = () => {
-    const blob = new Blob([value || ""], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+
+  // Closes the download menu on any click outside it — a plain toggle
+  // button with no other way to dismiss would otherwise stay open when
+  // the user clicks elsewhere in the panel.
+  useEffect(() => {
+    if (!downloadOpen) return;
+    const onClickAway = (e) => {
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target)) {
+        setDownloadOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickAway);
+    return () => document.removeEventListener("mousedown", onClickAway);
+  }, [downloadOpen]);
+
+  const runDownload = async (format) => {
+    setDownloadOpen(false);
+    setDownloading(true);
     const date = new Date().toISOString().slice(0, 10);
-    a.href = url;
-    a.download = `${slugify(title)}-${date}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const base = `${slugify(title)}-${date}`;
+    try {
+      if (format === "pdf") await downloadAsPdf(value || "", title, `${base}.pdf`);
+      else await downloadAsWord(value || "", title, `${base}.docx`);
+    } finally {
+      setDownloading(false);
+    }
   };
+
   return (
     <div className="flex h-full flex-col rounded-xl border border-stone-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
@@ -414,9 +496,43 @@ function OutputPanel({
             <button onClick={onRegenerate} className={BTN_SECONDARY}>
               <RefreshCw size={13} /> Regenerate
             </button>
-            <button onClick={handleDownload} className={BTN_SECONDARY}>
-              <Download size={13} /> Download
-            </button>
+            <div className="relative" ref={downloadMenuRef}>
+              <button
+                onClick={() => setDownloadOpen((o) => !o)}
+                disabled={downloading}
+                aria-haspopup="menu"
+                aria-expanded={downloadOpen}
+                className={BTN_SECONDARY}
+              >
+                {downloading ? (
+                  <Loader2 className="animate-spin" size={13} />
+                ) : (
+                  <Download size={13} />
+                )}
+                Download <ChevronDown size={12} />
+              </button>
+              {downloadOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full z-10 mt-1 w-36 overflow-hidden rounded-lg border border-stone-200 bg-white py-1 shadow-md"
+                >
+                  <button
+                    role="menuitem"
+                    onClick={() => runDownload("pdf")}
+                    className="block w-full px-3 py-1.5 text-left text-xs font-medium text-stone-700 hover:bg-stone-50"
+                  >
+                    PDF (.pdf)
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => runDownload("word")}
+                    className="block w-full px-3 py-1.5 text-left text-xs font-medium text-stone-700 hover:bg-stone-50"
+                  >
+                    Word (.docx)
+                  </button>
+                </div>
+              )}
+            </div>
             <button onClick={handleCopy} className={BTN_SECONDARY}>
               {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? "Copied" : "Copy"}
             </button>
