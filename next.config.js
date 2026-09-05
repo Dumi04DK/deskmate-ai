@@ -2,6 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Next's dev server auto-generates AGENTS.md/CLAUDE.md with
+  // instructions aimed at AI coding assistants — disabled: we don't
+  // want untrusted, auto-written content steering an AI agent's
+  // behavior in this repo.
+  agentRules: false,
   async headers() {
     return [
       {
