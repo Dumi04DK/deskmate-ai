@@ -2,6 +2,8 @@
 
 **Your workplace assistant.**
 
+🔗 **Live demo:** https://deskmate-ai-dk.vercel.app
+
 A Next.js app with five AI-powered tools (📧 email generator, 📝 meeting
 summarizer, ✅ task planner, 🔍 research assistant, 💬 chatbot), real
 accounts, a shared database, and a secure backend — running on free
