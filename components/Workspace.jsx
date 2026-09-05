@@ -494,13 +494,13 @@ function OutputPanel({
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-stone-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-3">
         <div className="flex items-center gap-2">
           {Icon && <Icon size={15} className="text-emerald-700" />}
           <span className="text-sm font-semibold text-stone-900">{title}</span>
         </div>
         {value && !loading && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={onRegenerate} className={BTN_SECONDARY}>
               <RefreshCw size={13} /> Regenerate
             </button>
