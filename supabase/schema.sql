@@ -13,7 +13,7 @@
 --   - aiw_history          -> public.generations (same table — the
 --                             "current draft" and "history" were
 --                             always the same data, just duplicated)
---   - aiw_chat             -> public.chat_messages
+--   - aiw_chat             -> public.chat_threads + public.chat_messages
 --   - in-memory rate limit -> public.usage_daily (see note near the
 --                             bottom — this table alone doesn't do
 --                             rate limiting, the API route has to use it)
@@ -122,22 +122,54 @@ create index if not exists generations_user_tool_created_idx
   on public.generations (user_id, tool, created_at desc);
 
 -- ---------------------------------------------------------------
--- chat_messages — the AI Chatbot's conversation. One flat table per
--- user (the app currently has a single ongoing thread, not multiple
--- named conversations — this schema supports adding a thread_id
--- later without a breaking change if that's ever wanted).
+-- chat_threads / chat_messages — the AI Chatbot's conversations.
+-- Each user can have any number of named threads (the "New chat"
+-- button creates one; the sidebar's chat history lists them by most
+-- recently active). chat_messages.thread_id scopes every message to
+-- one thread instead of one flat per-user log.
 -- ---------------------------------------------------------------
+
+create table if not exists public.chat_threads (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  title text not null default 'New chat',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists chat_threads_user_updated_idx
+  on public.chat_threads (user_id, updated_at desc);
 
 create table if not exists public.chat_messages (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
+  thread_id uuid not null references public.chat_threads (id) on delete cascade,
   role text not null check (role in ('user', 'assistant')),
   content text not null,
   created_at timestamptz not null default now()
 );
 
-create index if not exists chat_messages_user_created_idx
-  on public.chat_messages (user_id, created_at asc);
+create index if not exists chat_messages_thread_created_idx
+  on public.chat_messages (thread_id, created_at asc);
+
+-- Keeps chat_threads.updated_at current every time a message is added,
+-- so "most recently active" ordering in the sidebar is just an
+-- ORDER BY on chat_threads — no need to join chat_messages for it.
+create or replace function public.touch_chat_thread()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  update public.chat_threads set updated_at = now() where id = new.thread_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists chat_messages_touch_thread on public.chat_messages;
+create trigger chat_messages_touch_thread
+  after insert on public.chat_messages
+  for each row execute function public.touch_chat_thread();
 
 -- ---------------------------------------------------------------
 -- usage_daily — per-user, per-day, per-endpoint request counter. This
@@ -170,6 +202,7 @@ create table if not exists public.usage_daily (
 
 alter table public.profiles enable row level security;
 alter table public.generations enable row level security;
+alter table public.chat_threads enable row level security;
 alter table public.chat_messages enable row level security;
 alter table public.usage_daily enable row level security;
 
@@ -191,6 +224,22 @@ create policy "generations_insert_own" on public.generations
 
 drop policy if exists "generations_delete_own" on public.generations;
 create policy "generations_delete_own" on public.generations
+  for delete using (auth.uid() = user_id);
+
+drop policy if exists "chat_threads_select_own" on public.chat_threads;
+create policy "chat_threads_select_own" on public.chat_threads
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "chat_threads_insert_own" on public.chat_threads;
+create policy "chat_threads_insert_own" on public.chat_threads
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "chat_threads_update_own" on public.chat_threads;
+create policy "chat_threads_update_own" on public.chat_threads
+  for update using (auth.uid() = user_id);
+
+drop policy if exists "chat_threads_delete_own" on public.chat_threads;
+create policy "chat_threads_delete_own" on public.chat_threads
   for delete using (auth.uid() = user_id);
 
 drop policy if exists "chat_messages_select_own" on public.chat_messages;

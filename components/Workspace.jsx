@@ -9,6 +9,7 @@ import {
   Search,
   MessageSquare,
   Copy,
+  Download,
   RefreshCw,
   Send,
   Menu,
@@ -24,8 +25,9 @@ import {
   Clock,
   Sparkles,
 } from "lucide-react";
-import SignIn from "./SignIn";
+import SignIn, { ResetPasswordForm } from "./SignIn";
 import LogoMark from "./LogoMark";
+import { createClient } from "@/lib/supabase/client";
 
 /* ---------- Design tokens (reused Tailwind class strings) ---------- */
 
@@ -97,73 +99,72 @@ function usePersistentState(key, initialValue) {
 
 /* ---------- Generation history (shared across all tools) ---------- */
 
-// Every successful generation across every tool is logged to one shared
-// history list, keyed by which tool produced it. This is what lets the
-// sidebar show a combined "Recent" feed and each tool show its own past
-// results. It lives in localStorage like everything else here — no
-// backend yet — but is broadcast via a custom event so already-mounted
-// views (every tool stays mounted, just hidden, for instant tab
-// switching) pick up new entries without a page reload.
-const HISTORY_KEY = "aiw_history";
+// Every successful generation across every tool is one row in Supabase's
+// `generations` table (RLS-scoped to the signed-in user), keyed by which
+// tool produced it — this is what lets the sidebar show a combined
+// "Recent" feed grouped by tool, and each tool show its own past
+// results, from any device. A custom event triggers a refetch in
+// already-mounted views (every tool stays mounted, just hidden, for
+// instant tab switching) the moment a new entry is added elsewhere.
 const HISTORY_EVENT = "aiw:history-updated";
 const RESTORE_EVENT = "aiw:restore-entry";
 const MAX_HISTORY = 50;
 
-function readHistory() {
-  try {
-    const raw = window.localStorage.getItem(HISTORY_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+async function fetchGenerations(tool) {
+  const supabase = createClient();
+  let query = supabase
+    .from("generations")
+    .select("id, tool, label, inputs, output, source, created_at")
+    .order("created_at", { ascending: false })
+    .limit(MAX_HISTORY);
+  if (tool) query = query.eq("tool", tool);
+  const { data, error } = await query;
+  if (error) return [];
+  // The rest of this file works with entries shaped like the old
+  // localStorage ones (a millisecond `timestamp`), so adapt here rather
+  // than touching every call site.
+  return data.map((row) => ({ ...row, timestamp: new Date(row.created_at).getTime() }));
 }
 
-function addHistoryEntry(tool, label, inputs, output) {
-  try {
-    const entry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      tool,
-      label: (label || "Untitled").trim().slice(0, 80),
-      inputs,
-      output,
-      timestamp: Date.now(),
-    };
-    const next = [entry, ...readHistory()].slice(0, MAX_HISTORY);
-    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event(HISTORY_EVENT));
-  } catch {
-    /* storage full or unavailable — history is a nice-to-have, fail silently */
-  }
+async function addHistoryEntry(tool, label, inputs, output, source = "typed") {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("generations").insert({
+    user_id: user.id,
+    tool,
+    label: (label || "Untitled").trim().slice(0, 80),
+    inputs,
+    output,
+    source,
+  });
+  window.dispatchEvent(new Event(HISTORY_EVENT));
 }
 
-function removeHistoryEntry(id) {
-  try {
-    const next = readHistory().filter((e) => e.id !== id);
-    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event(HISTORY_EVENT));
-  } catch {
-    /* ignore */
-  }
+async function removeHistoryEntry(id) {
+  const supabase = createClient();
+  await supabase.from("generations").delete().eq("id", id);
+  window.dispatchEvent(new Event(HISTORY_EVENT));
 }
 
-// Reads the shared history and stays in sync with it — across tabs via
-// the native "storage" event, and within this tab via the custom event
-// addHistoryEntry fires (the "storage" event never fires in the tab
-// that made the write).
+// Loads this tool's (or, with no argument, every tool's) history from
+// Supabase and stays in sync with it via the custom event addHistoryEntry
+// / removeHistoryEntry fire.
 function useHistory(tool) {
   const [items, setItems] = useState([]);
   useEffect(() => {
-    const load = () => setItems(readHistory());
+    let active = true;
+    const load = () => fetchGenerations(tool).then((rows) => active && setItems(rows));
     load();
     window.addEventListener(HISTORY_EVENT, load);
-    window.addEventListener("storage", load);
     return () => {
+      active = false;
       window.removeEventListener(HISTORY_EVENT, load);
-      window.removeEventListener("storage", load);
     };
-  }, []);
-  return tool ? items.filter((e) => e.tool === tool) : items;
+  }, [tool]);
+  return items;
 }
 
 // Tells whichever tool view owns this entry to load it back into its
@@ -360,6 +361,17 @@ function ViewHeader({ icon: Icon, title, subtitle }) {
   );
 }
 
+// Turns a panel title into a safe filename fragment, e.g. "Generated
+// email" -> "generated-email". Downloaded files are named
+// "<slug>-<yyyy-mm-dd>.txt" so re-downloading later doesn't silently
+// overwrite an earlier one from the same day at a glance.
+function slugify(title) {
+  return (title || "output")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 function OutputPanel({
   icon: Icon,
   title,
@@ -376,6 +388,18 @@ function OutputPanel({
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
+  const handleDownload = () => {
+    const blob = new Blob([value || ""], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `${slugify(title)}-${date}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
   return (
     <div className="flex h-full flex-col rounded-xl border border-stone-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
@@ -387,6 +411,9 @@ function OutputPanel({
           <div className="flex items-center gap-2">
             <button onClick={onRegenerate} className={BTN_SECONDARY}>
               <RefreshCw size={13} /> Regenerate
+            </button>
+            <button onClick={handleDownload} className={BTN_SECONDARY}>
+              <Download size={13} /> Download
             </button>
             <button onClick={handleCopy} className={BTN_SECONDARY}>
               {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? "Copied" : "Copy"}
@@ -763,7 +790,7 @@ function EmailGeneratorView() {
       patch({ error: result.error });
     } else {
       patch({ output: result.text, error: "" });
-      addHistoryEntry(
+      await addHistoryEntry(
         "email",
         s.recipient ? `To ${s.recipient}` : s.purpose,
         {
@@ -853,14 +880,21 @@ function EmailGeneratorView() {
               </select>
             </div>
           </div>
-          <button
-            onClick={generate}
-            disabled={loading || !s.purpose.trim()}
-            className={`${BTN_PRIMARY} w-full`}
-          >
-            {loading ? <Loader2 className="animate-spin" size={15} /> : <Mail size={15} />}
-            {loading ? "Generating..." : "Generate email"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={generate}
+              disabled={loading || !s.purpose.trim()}
+              className={`${BTN_PRIMARY} flex-1`}
+            >
+              {loading ? <Loader2 className="animate-spin" size={15} /> : <Mail size={15} />}
+              {loading ? "Generating..." : "Generate email"}
+            </button>
+            {(s.recipient || s.purpose || s.points || s.output) && !loading && (
+              <button onClick={() => setS(EMAIL_DEFAULT)} className={BTN_SECONDARY}>
+                Clear
+              </button>
+            )}
+          </div>
           <ErrorBanner
             message={s.error}
             onRetry={generate}
@@ -994,7 +1028,7 @@ function MeetingSummarizerView() {
       patch({ error: result.error });
     } else {
       patch({ output: result.text, error: "" });
-      addHistoryEntry(
+      await addHistoryEntry(
         "meetings",
         s.notes.split("\n")[0] || s.style,
         { notes: s.notes, style: s.style },
@@ -1076,14 +1110,21 @@ function MeetingSummarizerView() {
               ))}
             </select>
           </div>
-          <button
-            onClick={generate}
-            disabled={loading || !s.notes.trim()}
-            className={`${BTN_PRIMARY} w-full`}
-          >
-            {loading ? <Loader2 className="animate-spin" size={15} /> : <FileText size={15} />}
-            {loading ? "Summarizing..." : "Summarize notes"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={generate}
+              disabled={loading || !s.notes.trim()}
+              className={`${BTN_PRIMARY} flex-1`}
+            >
+              {loading ? <Loader2 className="animate-spin" size={15} /> : <FileText size={15} />}
+              {loading ? "Summarizing..." : "Summarize notes"}
+            </button>
+            {(s.notes || s.output) && !loading && (
+              <button onClick={() => setS(MEETING_DEFAULT)} className={BTN_SECONDARY}>
+                Clear
+              </button>
+            )}
+          </div>
           <ErrorBanner
             message={s.error}
             onRetry={generate}
@@ -1128,7 +1169,7 @@ function TaskPlannerView() {
       patch({ error: result.error });
     } else {
       patch({ output: result.text, error: "" });
-      addHistoryEntry(
+      await addHistoryEntry(
         "tasks",
         s.goal,
         { goal: s.goal, deadline: s.deadline, constraints: s.constraints },
@@ -1185,14 +1226,21 @@ function TaskPlannerView() {
               placeholder="e.g. Team of 3, no budget for new tools, must integrate with existing CRM"
             />
           </div>
-          <button
-            onClick={generate}
-            disabled={loading || !s.goal.trim()}
-            className={`${BTN_PRIMARY} w-full`}
-          >
-            {loading ? <Loader2 className="animate-spin" size={15} /> : <ListChecks size={15} />}
-            {loading ? "Planning..." : "Generate plan"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={generate}
+              disabled={loading || !s.goal.trim()}
+              className={`${BTN_PRIMARY} flex-1`}
+            >
+              {loading ? <Loader2 className="animate-spin" size={15} /> : <ListChecks size={15} />}
+              {loading ? "Planning..." : "Generate plan"}
+            </button>
+            {(s.goal || s.deadline || s.constraints || s.output) && !loading && (
+              <button onClick={() => setS(TASK_DEFAULT)} className={BTN_SECONDARY}>
+                Clear
+              </button>
+            )}
+          </div>
           <ErrorBanner
             message={s.error}
             onRetry={generate}
@@ -1286,7 +1334,7 @@ function ResearchAssistantView() {
       patch({ error: result.error });
     } else {
       patch({ output: result.text, error: "" });
-      addHistoryEntry(
+      await addHistoryEntry(
         "research",
         s.topic,
         { topic: s.topic, depth: s.depth, fileName: s.fileName },
@@ -1387,14 +1435,27 @@ function ResearchAssistantView() {
               ))}
             </select>
           </div>
-          <button
-            onClick={generate}
-            disabled={loading || !s.topic.trim()}
-            className={`${BTN_PRIMARY} w-full`}
-          >
-            {loading ? <Loader2 className="animate-spin" size={15} /> : <Search size={15} />}
-            {loading ? "Researching..." : "Research this"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={generate}
+              disabled={loading || !s.topic.trim()}
+              className={`${BTN_PRIMARY} flex-1`}
+            >
+              {loading ? <Loader2 className="animate-spin" size={15} /> : <Search size={15} />}
+              {loading ? "Researching..." : "Research this"}
+            </button>
+            {(s.topic || s.fileName || s.output) && !loading && (
+              <button
+                onClick={() => {
+                  setS(RESEARCH_DEFAULT);
+                  setFileError("");
+                }}
+                className={BTN_SECONDARY}
+              >
+                Clear
+              </button>
+            )}
+          </div>
           <ErrorBanner
             message={s.error}
             onRetry={generate}
@@ -1595,12 +1656,19 @@ function GlobalStyles() {
   );
 }
 
-function AppShell({ user, onSignOut }) {
+function AppShell({ authUser, profile, onSignOut }) {
   const [view, setView] = useState("dashboard");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const currentNavItem = NAV_ITEMS.find((n) => n.id === view) || NAV_ITEMS[0];
-  const firstName = user.name.trim().split(/\s+/)[0];
-  const recent = useHistory().slice(0, 5);
+  const displayName = profile?.name || authUser.email;
+  const firstName = displayName.trim().split(/\s+/)[0];
+  // Grouped by tool (Email / Meetings / Tasks / Research) rather than one
+  // flat mixed list, so "Recent" reads as clear categories instead of an
+  // interleaved feed where it's easy to lose track of which item is which.
+  const allRecent = useHistory();
+  const recentByTool = ["email", "meetings", "tasks", "research"]
+    .map((tool) => ({ tool, items: allRecent.filter((e) => e.tool === tool).slice(0, 3) }))
+    .filter((group) => group.items.length > 0);
 
   const handleNavigate = (id) => {
     setView(id);
@@ -1664,7 +1732,7 @@ function AppShell({ user, onSignOut }) {
               Recent
             </p>
           </div>
-          {recent.length === 0 ? (
+          {recentByTool.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center py-4 text-center">
               <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50">
                 <Clock size={16} className="text-emerald-700" />
@@ -1674,23 +1742,32 @@ function AppShell({ user, onSignOut }) {
               </p>
             </div>
           ) : (
-            <div className="space-y-0.5">
-              {recent.map((item) => {
-                const Icon = TOOL_META[item.tool]?.icon || FileText;
+            <div className="space-y-3">
+              {recentByTool.map(({ tool, items }) => {
+                const meta = TOOL_META[tool];
+                const Icon = meta.icon;
                 return (
-                  <button
-                    key={item.id}
-                    onClick={() => openRecent(item)}
-                    className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition hover:bg-stone-50"
-                  >
-                    <Icon size={13} className="shrink-0 text-stone-400" />
-                    <span className="min-w-0 flex-1 truncate text-xs text-stone-700">
-                      {item.label}
-                    </span>
-                    <span className="shrink-0 text-[10px] text-stone-300">
-                      {relativeTime(item.timestamp)}
-                    </span>
-                  </button>
+                  <div key={tool}>
+                    <p className="mb-1 flex items-center gap-1.5 px-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+                      <Icon size={11} /> {meta.label}
+                    </p>
+                    <div className="space-y-0.5">
+                      {items.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => openRecent(item)}
+                          className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition hover:bg-stone-50"
+                        >
+                          <span className="min-w-0 flex-1 truncate text-xs text-stone-700">
+                            {item.label}
+                          </span>
+                          <span className="shrink-0 text-[10px] text-stone-300">
+                            {relativeTime(item.timestamp)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -1699,17 +1776,17 @@ function AppShell({ user, onSignOut }) {
         <div className="border-t border-white/10 p-3">
           <div
             className="flex items-center gap-2.5 rounded-lg px-2 py-2"
-            title={[user.company, user.email].filter(Boolean).join(" · ") || undefined}
+            title={[profile?.company, authUser.email].filter(Boolean).join(" · ") || undefined}
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-emerald-800">
-              {initialsOf(user.name)}
+              {initialsOf(displayName)}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white" title={user.name}>
-                {user.name}
+              <p className="truncate text-sm font-medium text-white" title={displayName}>
+                {displayName}
               </p>
               <p className="truncate text-xs text-stone-400">
-                {user.company || user.email || "Local workspace"}
+                {profile?.company || authUser.email}
               </p>
             </div>
           </div>
@@ -1771,16 +1848,75 @@ function AppShell({ user, onSignOut }) {
   );
 }
 
+// Tracks the real Supabase auth session (not localStorage) plus the
+// matching profiles row (name/company — see supabase/schema.sql's
+// on_auth_user_created trigger, which creates that row automatically
+// on sign-up). Re-runs whenever auth state changes, so sign-in,
+// sign-out, and the email-confirmation redirect all just work without
+// a page reload.
+function useSupabaseSession() {
+  const [state, setState] = useState({
+    loading: true,
+    authUser: null,
+    profile: null,
+    recovering: false,
+  });
+
+  useEffect(() => {
+    const supabase = createClient();
+    let active = true;
+
+    async function load(authUser, recovering) {
+      if (!authUser) {
+        if (active) setState({ loading: false, authUser: null, profile: null, recovering: false });
+        return;
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name, company")
+        .eq("id", authUser.id)
+        .single();
+      if (active) setState({ loading: false, authUser, profile: profile || null, recovering });
+    }
+
+    supabase.auth.getUser().then(({ data }) => load(data.user, false));
+
+    // PASSWORD_RECOVERY fires the moment a password-reset link's URL is
+    // loaded — it carries a real (temporary) session, but the user
+    // should set a new password before landing in the app, not skip
+    // straight past it. Any later event (e.g. the USER_UPDATED that
+    // follows a successful auth.updateUser() call) clears the flag.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) =>
+      load(session?.user ?? null, event === "PASSWORD_RECOVERY"),
+    );
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  return state;
+}
+
 export default function Workspace() {
-  const [user, setUser, hydrated] = usePersistentState("aiw_user", null);
+  const { loading, authUser, profile, recovering } = useSupabaseSession();
 
   return (
     <>
       <GlobalStyles />
-      {!hydrated ? null : !user ? (
-        <SignIn onComplete={setUser} />
+      {loading ? null : recovering ? (
+        <ResetPasswordForm />
+      ) : !authUser ? (
+        <SignIn />
       ) : (
-        <AppShell user={user} onSignOut={() => setUser(null)} />
+        <AppShell
+          authUser={authUser}
+          profile={profile}
+          onSignOut={() => createClient().auth.signOut()}
+        />
       )}
     </>
   );
