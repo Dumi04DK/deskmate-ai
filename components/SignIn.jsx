@@ -122,8 +122,9 @@ export default function SignIn() {
         title="Check your email"
         message={
           <>
-            We sent a confirmation link to <span className="font-medium text-stone-700">{email}</span>.
-            Click it, then come back and sign in.
+            We sent a confirmation link to{" "}
+            <span className="font-medium text-stone-700">{email}</span>. Click it, then come back
+            and sign in.
           </>
         }
         cta="Back to sign in"
@@ -303,7 +304,11 @@ export default function SignIn() {
               <Loader2 className="animate-spin" size={15} />
             ) : (
               <>
-                {mode === "signup" ? "Create workspace" : mode === "signin" ? "Sign in" : "Send reset link"}{" "}
+                {mode === "signup"
+                  ? "Create workspace"
+                  : mode === "signin"
+                    ? "Sign in"
+                    : "Send reset link"}{" "}
                 <ArrowRight size={15} />
               </>
             )}
@@ -317,7 +322,9 @@ export default function SignIn() {
               }}
               className="mt-4 w-full text-center text-xs text-stone-500 hover:text-stone-700"
             >
-              {mode === "signup" ? "Already have a workspace? Sign in" : "Need a workspace? Create one"}
+              {mode === "signup"
+                ? "Already have a workspace? Sign in"
+                : "Need a workspace? Create one"}
             </button>
           ) : (
             <button
